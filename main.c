@@ -42,6 +42,7 @@ int main(int argc, char **argv)
   srand((unsigned int)time(NULL));
 
   int turn;
+  int passed = 0;
   for (turn = 1;; turn *= -1) {
     print_board();
 
@@ -50,11 +51,12 @@ int main(int argc, char **argv)
     if (nmoves == -1) break;     // no empty square
     if (nmoves ==  0) { // pass
       printf("turn = %d, move = Pass\n", turn);
-      continue;  
+      if (passed == 0) {passed = 1; continue;}
+      else break;
     }
 
     IntPair move;
-    if (turn == human_side) {
+    if (1) {
       while (1) {
 	printf("Where? ");
 	char buf[1000];
