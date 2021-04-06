@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     }
 
     IntPair move;
-    if (1) {
+    if (turn == human_side) {
       while (1) {
 	printf("Where? ");
 	char buf[1000];
