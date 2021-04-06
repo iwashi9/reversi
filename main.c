@@ -34,6 +34,21 @@ static void print_board()
   putchar('\n');
 }
 
+static void win_loss_judge()
+{
+  int black_count = 0;
+  int white_count = 0;
+  for (int y = 0; y < 8; y++)
+    for (int x = 0; x < 8; x++) {
+      if (board[y][x] == 1) black_count++;
+      else if (board[y][x] == -1) white_count++;
+    }
+
+  if (black_count == white_count) printf("Draw.\n");
+  else if (black_count < white_count) printf("White win!\n");
+  else if (black_count > white_count) printf("Black win!\n");
+}
+
 int main(int argc, char **argv)
 {
   const int human_side = (argc >= 2) ? atoi(argv[1]) : 0;
@@ -75,17 +90,7 @@ int main(int argc, char **argv)
     place_disk(turn, move);
   }
 
-  int black_count = 0;
-  int white_count = 0;
-  for (int y = 0; y < 8; y++)
-    for (int x = 0; x < 8; x++) {
-      if (board[y][x] == 1) black_count++;
-      else if (board[y][x] == -1) white_count++;
-    }
-
-  if (black_count == white_count) printf("Draw.\n");
-  else if (black_count < white_count) printf("White win!\n");
-  else if (black_count > white_count) printf("Black win!\n");
+  win_loss_judge();
 
   return 0;
 }
