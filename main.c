@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "move.h"
 
 int board[8][8];  // 8x8 squares: 0 -> empty; 1 -> black; -1 -> white
@@ -38,6 +39,7 @@ int main(int argc, char **argv)
   const int human_side = (argc >= 2) ? atoi(argv[1]) : 0;
 
   init_board();
+  srand((unsigned int)time(NULL));
 
   int turn;
   for (turn = 1;; turn *= -1) {
@@ -63,7 +65,8 @@ int main(int argc, char **argv)
 	printf("%s is not a legal move!\n\n", buf);
       } 
     } else {
-      move = legal_moves[0];  // choose the first legal move
+      // move = legal_moves[0];  // choose the first legal move
+      move = legal_moves[rand() % nmoves];  // choose random legal move
       printf("turn = %d, move = %c%c\n", 
 	     turn, 'a' + move.first, '1' + move.second);
     }
