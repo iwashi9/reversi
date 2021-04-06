@@ -4,9 +4,12 @@
 #include "move.h"
 
 int board[8][8];  // 8x8 squares: 0 -> empty; 1 -> black; -1 -> white
+IntPair moves_history[70];
+int history_index;
 
 static void init_board()
 {
+  history_index = 0;
   int x, y;
   for (y = 0; y < 8; y++) 
     for (x = 0; x < 8; x++)
@@ -34,6 +37,40 @@ static void print_board()
   putchar('\n');
 }
 
+static void reload_board()
+{
+  init_board();
+  int passed = 0;
+  for (int i = 0; i < history_index; ++i) {
+    int turn = ((i+1)%2)*2-1;
+    IntPair legal_moves[60];
+    const int nmoves = generate_all_legal_moves(turn, legal_moves);
+    if (nmoves == -1) break;     // no empty square
+    if (nmoves ==  0) { // pass
+      printf("turn = %d, move = Pass\n", turn);
+      if (passed == 0) {passed = 1; continue;}
+      else break;
+    }
+    place_disk(turn, moves_history[i]);
+    passed = 0;
+  }
+}
+
+static void win_loss_judge()
+{
+  int black_count = 0;
+  int white_count = 0;
+  for (int y = 0; y < 8; y++)
+    for (int x = 0; x < 8; x++) {
+      if (board[y][x] == 1) black_count++;
+      else if (board[y][x] == -1) white_count++;
+    }
+
+  if (black_count == white_count) printf("Draw.\n");
+  else if (black_count < white_count) printf("White win!\n");
+  else if (black_count > white_count) printf("Black win!\n");
+}
+
 int main(int argc, char **argv)
 {
   const int human_side = (argc >= 2) ? atoi(argv[1]) : 0;
@@ -43,6 +80,7 @@ int main(int argc, char **argv)
 
   int turn;
   int passed = 0;
+  int undo = 0;
   for (turn = 1;; turn *= -1) {
     print_board();
 
@@ -56,13 +94,24 @@ int main(int argc, char **argv)
     }
 
     IntPair move;
-    if (1) {
+    if (turn == human_side) {
       while (1) {
 	printf("Where? ");
 	char buf[1000];
 	scanf("%s", buf);
+
+  if (buf[0] == 'z') {
+    history_index -= 2;
+    turn *= -1;
+    if (history_index < 0) {history_index = 0; turn = -1;}
+    reload_board();
+    undo = 1;
+    break;
+  }
+
 	move.first  = buf[0] - 'a';
 	move.second = buf[1] - '1';
+
 	if (is_legal_move(turn, move)) break;
 	printf("%s is not a legal move!\n\n", buf);
       } 
@@ -72,17 +121,14 @@ int main(int argc, char **argv)
       printf("turn = %d, move = %c%c\n", 
 	     turn, 'a' + move.first, '1' + move.second);
     }
+
+    if (undo) {undo = 0; continue;}
+
     place_disk(turn, move);
+    moves_history[history_index++] = move;
   }
 
-  int black_count = 0;
-  for (int y = 0; y < 8; y++)
-    for (int x = 0; x < 8; x++)
-      if (board[y][x] == 1) black_count++;
-
-  if (black_count == 32) printf("Draw.\n");
-  else if (black_count < 32) printf("White win!\n");
-  else printf("Black win!\n");
+  win_loss_judge();
 
   return 0;
 }
