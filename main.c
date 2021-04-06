@@ -4,12 +4,12 @@
 #include "move.h"
 
 int board[8][8];  // 8x8 squares: 0 -> empty; 1 -> black; -1 -> white
-IntPair moves_history[70];
+IntPair moves_history[60];
 int history_index;
+int turn;
 
 static void init_board()
 {
-  history_index = 0;
   int x, y;
   for (y = 0; y < 8; y++) 
     for (x = 0; x < 8; x++)
@@ -37,17 +37,21 @@ static void print_board()
   putchar('\n');
 }
 
-static void reload_board()
+static void undo_board(int n) // 履歴を初めから辿ってn手局面を巻き戻し
 {
   init_board();
+  history_index -= n;
+  if (history_index < 0) 
+    history_index = 0;
+
+  turn = -1;
   int passed = 0;
   for (int i = 0; i < history_index; ++i) {
-    int turn = ((i+1)%2)*2-1;
+    if (!passed) turn *= -1;
     IntPair legal_moves[60];
     const int nmoves = generate_all_legal_moves(turn, legal_moves);
     if (nmoves == -1) break;     // no empty square
     if (nmoves ==  0) { // pass
-      printf("turn = %d, move = Pass\n", turn);
       if (passed == 0) {passed = 1; continue;}
       else break;
     }
@@ -55,6 +59,7 @@ static void reload_board()
     passed = 0;
   }
 }
+
 
 static void win_loss_judge()
 {
@@ -78,8 +83,7 @@ int main(int argc, char **argv)
   init_board();
   srand((unsigned int)time(NULL));
 
-  int turn;
-  int passed = 0;
+  int passed = 0; // 両者パスの判定用
   int undo = 0;
   for (turn = 1;; turn *= -1) {
     print_board();
@@ -101,10 +105,7 @@ int main(int argc, char **argv)
 	scanf("%s", buf);
 
   if (buf[0] == 'z') {
-    history_index -= 2;
-    turn *= -1;
-    if (history_index < 0) {history_index = 0; turn = -1;}
-    reload_board();
+    undo_board(2);
     undo = 1;
     break;
   }
@@ -125,6 +126,7 @@ int main(int argc, char **argv)
     if (undo) {undo = 0; continue;}
 
     place_disk(turn, move);
+    passed = 0;
     moves_history[history_index++] = move;
   }
 
