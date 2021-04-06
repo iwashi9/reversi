@@ -70,5 +70,14 @@ int main(int argc, char **argv)
     place_disk(turn, move);
   }
 
+  int black_count = 0;
+  for (int y = 0; y < 8; y++)
+    for (int x = 0; x < 8; x++)
+      if (board[y][x] == 1) black_count++;
+
+  if (black_count == 32) printf("Draw.\n");
+  else if (black_count < 32) printf("White win!\n");
+  else printf("Black win!\n");
+
   return 0;
 }
