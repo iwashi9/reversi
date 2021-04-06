@@ -76,13 +76,16 @@ int main(int argc, char **argv)
   }
 
   int black_count = 0;
+  int white_count = 0;
   for (int y = 0; y < 8; y++)
-    for (int x = 0; x < 8; x++)
+    for (int x = 0; x < 8; x++) {
       if (board[y][x] == 1) black_count++;
+      else if (board[y][x] == -1) white_count++;
+    }
 
-  if (black_count == 32) printf("Draw.\n");
-  else if (black_count < 32) printf("White win!\n");
-  else printf("Black win!\n");
+  if (black_count == white_count) printf("Draw.\n");
+  else if (black_count < white_count) printf("White win!\n");
+  else if (black_count > white_count) printf("Black win!\n");
 
   return 0;
 }
