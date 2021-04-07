@@ -3,10 +3,60 @@
 #include <time.h>
 #include "move.h"
 
+static void undo_board(int n);
+static void init_board();
+static void print_board();
+
 int board[8][8];  // 8x8 squares: 0 -> empty; 1 -> black; -1 -> white
 IntPair moves_history[60];
 int history_index;
-int turn;
+
+int weight[8][8] = {
+  {30, -12, 0, -1, -1, 0, -12, 30},
+  {-12 -15 -3, -3, -3, -3, -15, -12},
+  {0, -3, 0, -1, -1, 0, -3, 0},
+  {-1, -3, 1, -1, -1, -1, -3, -1},
+  {-1, -3, 1, -1, -1, -1, -3, -1},
+  {0, -3, 0, -1, -1, 0, -3, 0},
+  {-12 -15 -3, -3, -3, -3, -15, -12},
+  {30, -12, 0, -1, -1, 0, -12, 30}
+};
+
+static int evaluate(int turn)
+{
+  int score = 0;
+  int x, y;
+  for (y = 0; y < 8; y++)
+    for (x = 0; x < 8; x++) {
+      if (board[x][y] == turn) score += weight[x][y];
+    }
+  return score;
+}
+
+IntPair best_move;
+static int negamax(int depth, int max_depth, int turn)
+{
+  if (depth == max_depth)
+    return evaluate(turn) * turn;
+
+  int best = -1e9;
+  IntPair legal_moves[60];
+  const int nmoves = generate_all_legal_moves(turn, legal_moves);
+  for (int i = 0; i < nmoves; ++i) {
+    // printf("%d %d\n", legal_moves[i].first, legal_moves[i].second);
+    place_disk(turn, legal_moves[i]); 
+    moves_history[history_index++] = legal_moves[i];
+    // print_board();
+    int v = -negamax(depth+1, max_depth, -turn);
+    if (v > best) {
+      best = v;
+      if (depth == 0) 
+        best_move = legal_moves[i];
+    }
+    undo_board(1);
+  }
+  return best;
+}
 
 static void init_board()
 {
@@ -44,7 +94,7 @@ static void undo_board(int n) // 履歴を初めから辿ってn手局面を巻�
   if (history_index < 0) 
     history_index = 0;
 
-  turn = -1;
+  int turn = -1;
   int passed = 0;
   for (int i = 0; i < history_index; ++i) {
     if (!passed) turn *= -1;
@@ -60,15 +110,14 @@ static void undo_board(int n) // 履歴を初めから辿ってn手局面を巻�
   }
 }
 
-
 static void win_loss_judge()
 {
   int black_count = 0;
   int white_count = 0;
   for (int y = 0; y < 8; y++)
     for (int x = 0; x < 8; x++) {
-      if (board[y][x] == 1) black_count++;
-      else if (board[y][x] == -1) white_count++;
+      if (board[x][y] == 1) black_count++;
+      else if (board[x][y] == -1) white_count++;
     }
 
   if (black_count == white_count) printf("Draw.\n");
@@ -85,6 +134,7 @@ int main(int argc, char **argv)
 
   int passed = 0; // 両者パスの判定用
   int undo = 0;
+  int turn;
   for (turn = 1;; turn *= -1) {
     print_board();
 
@@ -100,9 +150,9 @@ int main(int argc, char **argv)
     IntPair move;
     if (turn == human_side) {
       while (1) {
-	printf("Where? ");
-	char buf[1000];
-	scanf("%s", buf);
+  printf("Where? ");
+  char buf[1000];
+  scanf("%s", buf);
 
   if (buf[0] == 'z') {
     undo_board(2);
@@ -110,17 +160,19 @@ int main(int argc, char **argv)
     break;
   }
 
-	move.first  = buf[0] - 'a';
-	move.second = buf[1] - '1';
+  move.first  = buf[0] - 'a';
+  move.second = buf[1] - '1';
 
-	if (is_legal_move(turn, move)) break;
-	printf("%s is not a legal move!\n\n", buf);
+  if (is_legal_move(turn, move)) break;
+  printf("%s is not a legal move!\n\n", buf);
       } 
     } else {
       // move = legal_moves[0];  // choose the first legal move
-      move = legal_moves[rand() % nmoves];  // choose random legal move
+      // move = legal_moves[rand() % nmoves];  // choose random legal move
+      negamax(0,3,turn);
+      move = best_move;
       printf("turn = %d, move = %c%c\n", 
-	     turn, 'a' + move.first, '1' + move.second);
+       turn, 'a' + move.first, '1' + move.second);
     }
 
     if (undo) {undo = 0; continue;}
