@@ -11,16 +11,19 @@ typedef struct bit_board {
 } Board;
 
 typedef struct history {
-  Board board[60];
+  Board board[61];
   int index;
 } History;
+
+int min_node(Board board, int depth, int max_depth, ul* best_put);
+int max_node(Board board, int depth, int max_depth, ul* best_put);
 
 
 Board init_board()
 {
   Board board;
-  board.black_board = 0x0000000810000000;
-  board.white_board = 0x0000001008000000;
+  board.black_board = 0x0000000810000000; board.white_board = 0x0000001008000000;
+  // board.black_board = 0x0000001008000000; board.white_board = 0x0000000810000000;
   board.turn = 1;
   return board;
 }
@@ -215,7 +218,7 @@ ul reverse_(Board board, ul put)
   return rev;
 }
 
-// turn側に石を置く．
+// Board.turn側に石を置く．
 Board reverse(Board board, ul put)
 {
   ul player_bit_board = 
@@ -235,7 +238,6 @@ Board reverse(Board board, ul put)
 
 int is_pass(Board board)
 {
-
   ul player_legal = generate_all_legal_moves(board);
   board.turn *= -1;
   ul opponent_legal = generate_all_legal_moves(board);
@@ -269,41 +271,105 @@ ul get_random_move(ul moves)
 }
 
 int weight[8][8] = {
-  {30, -12, 0, -1, -1, 0, -12, 30},
-  {-12 -15 -3, -3, -3, -3, -15, -12},
-  {0, -3, 0, -1, -1, 0, -3, 0},
-  {-1, -3, 1, -1, -1, -1, -3, -1},
-  {-1, -3, 1, -1, -1, -1, -3, -1},
-  {0, -3, 0, -1, -1, 0, -3, 0},
-  {-12 -15 -3, -3, -3, -3, -15, -12},
-  {30, -12, 0, -1, -1, 0, -12, 30}
+  {30 , -12, 0 , -1, -1, 0 , -12, 30 },
+  {-12, -15, -3, -3, -3, -3, -15, -12},
+  {0  , -3 , 0 , -1, -1, 0 , -3 , 0  },
+  {-1 , -3 , -1, -1, -1, -1, -3 , -1 },
+  {-1 , -3 , -1, -1, -1, -1, -3 , -1 },
+  {0  , -3 , 0 , -1, -1, 0 , -3 , 0  },
+  {-12, -15, -3, -3, -3, -3, -15, -12},
+  {30 , -12, 0 , -1, -1, 0 , -12, 30 }
 };
 
 int eval(Board board)
 {
-  ul player_bit_board = 
-    (board.turn == 1) ? board.black_board : board.white_board;
-  ul opponent_bit_board = 
-    (board.turn == 1) ? board.white_board : board.black_board;
-
   int score = 0;
   for (int i = 0; i < 8; ++i)
     for (int j = 0; j < 8; ++j) {
-      score += weight[i][j] * bit_count((1UL << (8*i+j)) & player_bit_board);
-      score -= weight[i][j] * bit_count((1UL << (8*i+j)) & opponent_bit_board);
+      if ((1UL << (8*i+j)) & board.black_board) score += weight[i][j];
+      if ((1UL << (8*i+j)) & board.white_board) score -= weight[i][j];
     }
   return score;
 }
 
+int max_node(Board board, int depth, int max_depth, ul* best_put)
+{
+  if (depth == max_depth)
+    return eval(board);
+  if (is_finished(board))
+    return bit_count(board.black_board) - bit_count(board.white_board);
+  if (is_pass(board)) {
+    board.turn *= -1;
+    return min_node(board, depth+1, max_depth, NULL);
+  }
+
+  int best = -1e9;
+  ul legal = generate_all_legal_moves(board);
+  int n = bit_count(legal);
+  for (int i = 0; i < 64; ++i) {
+    ul put = 1UL << i;
+    if (legal & put) {
+      Board new_board = reverse(board, put);
+      int v = min_node(new_board, depth+1, max_depth, NULL);
+      if (v > best) {
+        best = v;
+        if (depth == 0) 
+          *best_put = put;
+      }
+    }
+  }
+  return best;
+}
+
+int min_node(Board board, int depth, int max_depth, ul* best_put)
+{
+  if (depth == max_depth)
+    return eval(board);
+  if (is_finished(board))
+    return bit_count(board.black_board) - bit_count(board.white_board);
+  if (is_pass(board)) {
+    board.turn *= -1;
+    return max_node(board, depth+1, max_depth, NULL);
+  }
+
+  int best = 1e9;
+  ul legal = generate_all_legal_moves(board);
+  int n = bit_count(legal);
+  for (int i = 0; i < 64; ++i) {
+    ul put = 1UL << i;
+    if (legal & put) {
+      Board new_board = reverse(board, put);
+      int v = max_node(new_board, depth+1, max_depth, NULL);
+      if (v < best) {
+        best = v;
+        if (depth == 0) 
+          *best_put = put;
+      }
+    }
+  }
+  return best;
+}
+
+ul minimax(Board board, int max_depth)
+{
+  ul best_put;
+  if (board.turn == 1)
+    max_node(board, 0, max_depth, &best_put);
+  else
+    min_node(board, 0, max_depth, &best_put);
+  return best_put;
+}
 
 int negamax_(Board board, int depth, int max_depth, ul* best_put)
 {
   if (depth == max_depth)
-    return eval(board);
-  if (is_pass(board))
-    return -100;
+    return eval(board)*board.turn;
+  if (is_pass(board)) {
+    board.turn *= -1;
+    return -negamax_(board, depth+1, max_depth, NULL);
+  }
   if (is_finished(board))
-    return (bit_count(board.black_board) - bit_count(board.white_board))*board.turn;
+    return bit_count(board.black_board) - bit_count(board.white_board);
 
   int best = -1e9;
   ul legal = generate_all_legal_moves(board);
@@ -323,7 +389,6 @@ int negamax_(Board board, int depth, int max_depth, ul* best_put)
   return best;
 }
 
-
 ul negamax(Board board, int max_depth)
 {
   ul best_put;
@@ -332,20 +397,28 @@ ul negamax(Board board, int max_depth)
 }
 
 
-void game()
+ul next_put(Board board)
+{
+  int max_depth = 5;
+  ul put = negamax(board, max_depth);
+  return put;
+}
+
+int game(int verbose)
 {
   Board board = init_board();
+  board.turn *= 1;
   History hist;
   hist.board[0] = board;
   hist.index = 1;
 
-  int human_side = 2;
+  int human_side = 0;
 
   while (1) {
-    print_board(board);
+    if (verbose) print_board(board);
 
     if (is_pass(board)) {
-      printf("turn = %2d, move = Pass\n", board.turn);
+      if (verbose) printf("turn = %2d, move = Pass\n", board.turn);
       board.turn *= -1;
       continue;
     }
@@ -358,11 +431,14 @@ void game()
         printf("Where? ");
         scanf("%s", buf);
         if (buf[0] == 'u') break;
+        if (buf[0] == 'l') {
+          print_mask(generate_all_legal_moves(board));
+          continue;
+        }
         put = to_bit_board(buf[0]-'a', buf[1]-'1');
         if (generate_all_legal_moves(board) & put) break;
         printf("%s is not a legal move!\n\n", buf);
       }
-
       if (buf[0] == 'u') { // 自分のターンに戻るまでundo()
         do {
           hist.index--;
@@ -370,29 +446,40 @@ void game()
         } while (hist.index != 0 && board.turn != human_side);
         continue;
       }
-    } 
-
-    else {
-      // ul legal = generate_all_legal_moves();
-      // put = get_random_move(legal);
-      put = negamax(board, 6);
     }
 
-    printf("turn = %2d, put = %#017lx\n", board.turn, put);
+    else {
+      if (board.turn == -2) {
+        ul legal = generate_all_legal_moves(board);
+        put = get_random_move(legal);
+      }
+      else {
+        put = next_put(board);
+      }
+    }
+
+    if (verbose) printf("turn = %2d, put = %#017lx\n", board.turn, put);
     board = reverse(board, put);
+    hist.board[hist.index++] = board;
   }
 
   int black_count = bit_count(board.black_board);
   int white_count = bit_count(board.white_board);
-  if (black_count == white_count) printf("%d - %d  Draw.\n", black_count, white_count);
-  if (black_count > white_count) printf("%d - %d  Black Win!\n", black_count, white_count);
-  if (black_count < white_count) printf("%d - %d  White Win!\n", black_count, white_count);
+  if (verbose) {
+    if (black_count == white_count) printf("%d - %d  Draw.\n", black_count, white_count);
+    if (black_count > white_count) printf("%d - %d  Black Win!\n", black_count, white_count);
+    if (black_count < white_count) printf("%d - %d  White Win!\n", black_count, white_count);
+  }
+  return black_count-white_count;
 }
 
 int main(void)
 {
   srand((unsigned int)time(NULL));
-  game();
-  return 0;
+  // int s = 0;
+  // for (int i = 0; i < 100; ++i) s += (game(0) > 0) ? 1 : 0;
+  // printf("black wins: %d/100\n",s);
+  // return 0;
+  game(1);
 }
 
