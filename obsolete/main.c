@@ -6,6 +6,7 @@
 static void undo_board(int n);
 static void init_board();
 static void print_board();
+static int count_board(int turn);
 
 int board[8][8];  // 8x8 squares: 0 -> empty; 1 -> black; -1 -> white
 IntPair moves_history[60];
@@ -22,13 +23,14 @@ int weight[8][8] = {
   {30, -12, 0, -1, -1, 0, -12, 30}
 };
 
-static int evaluate(int turn)
+static int evaluate()
 {
   int score = 0;
   int x, y;
   for (y = 0; y < 8; y++)
     for (x = 0; x < 8; x++) {
-      if (board[x][y] == turn) score += weight[x][y];
+      if (board[x][y] == 0) continue;
+      else score += weight[x][y] * board[x][y];
     }
   return score;
 }
@@ -37,14 +39,17 @@ IntPair best_move;
 static int negamax(int depth, int max_depth, int turn)
 {
   if (depth == max_depth)
-    return evaluate(turn) * turn;
+    return evaluate() * turn;
 
   int best = -1e9;
   IntPair legal_moves[60];
   const int nmoves = generate_all_legal_moves(turn, legal_moves);
+  if (nmoves == 0) return -100;
+  if (nmoves == -1) return count_board(turn)-count_board(-turn);
   for (int i = 0; i < nmoves; ++i) {
     // printf("%d %d\n", legal_moves[i].first, legal_moves[i].second);
     place_disk(turn, legal_moves[i]); 
+    print_board();
     moves_history[history_index++] = legal_moves[i];
     // print_board();
     int v = -negamax(depth+1, max_depth, -turn);
@@ -110,15 +115,20 @@ static void undo_board(int n) // 履歴を初めから辿ってn手局面を巻�
   }
 }
 
-static void win_loss_judge()
+static int count_board(int turn)
 {
-  int black_count = 0;
-  int white_count = 0;
+  int count = 0;
   for (int y = 0; y < 8; y++)
     for (int x = 0; x < 8; x++) {
-      if (board[x][y] == 1) black_count++;
-      else if (board[x][y] == -1) white_count++;
+      if (board[x][y] == turn) count++;
     }
+  return count;  
+}
+
+static void win_loss_judge()
+{
+  int black_count = count_board(1);
+  int white_count = count_board(-1);
 
   if (black_count == white_count) printf("Draw.\n");
   else if (black_count < white_count) printf("White win!\n");
@@ -169,7 +179,7 @@ int main(int argc, char **argv)
     } else {
       // move = legal_moves[0];  // choose the first legal move
       // move = legal_moves[rand() % nmoves];  // choose random legal move
-      negamax(0,3,turn);
+      negamax(0,4,turn);
       move = best_move;
       printf("turn = %d, move = %c%c\n", 
        turn, 'a' + move.first, '1' + move.second);
