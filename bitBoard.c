@@ -4,25 +4,27 @@
 
 typedef unsigned long ul;
 
+typedef struct bit_board {
+  ul black_board;
+  ul white_board;
+  int turn;
+} Board;
+
 typedef struct history {
+  Board board[60];
   int index;
-  ul put[60];
-  ul rev[60];
-  int turn[60];
 } History;
 
-ul player_bit_board;
-ul opponent_bit_board;
-int turn;
-History hist;
 
-void init_board()
+Board init_board()
 {
-  player_bit_board = 0x0000000810000000;
-  opponent_bit_board = 0x0000001008000000;
-  turn = 1;
-  hist.index = 0;
+  Board board;
+  board.black_board = 0x0000000810000000;
+  board.white_board = 0x0000001008000000;
+  board.turn = 1;
+  return board;
 }
+
 
 void print_mask(ul mask)
 {
@@ -41,7 +43,8 @@ void print_mask(ul mask)
   putchar('\n');  
 }
 
-void print_board()
+
+void print_board(Board board)
 {
   int x, y;
   puts("\n  a b c d e f g h");
@@ -50,14 +53,15 @@ void print_board()
     for (x = 0; x < 8; x++) {
       const ul s = 1L << (63-8*y-x);
       char c = '-';
-      if (player_bit_board & s) c = (turn == 1) ? 'B' : 'W';
-      if (opponent_bit_board & s) c = (turn == 1) ? 'W' : 'B';
+      if (board.black_board & s) c = 'B';
+      if (board.white_board & s) c = 'W';
       printf("%c ", c);
     }
     putchar('\n');
   }
   putchar('\n');
 }
+
 
 int bit_count(ul a)
 {
@@ -70,10 +74,15 @@ int bit_count(ul a)
   return (int)a;
 }
 
+
 // 全合法手を生成する．
-ul generate_all_legal_moves()
+ul generate_all_legal_moves(Board board)
 {
-  int i;
+  ul player_bit_board = 
+    (board.turn == 1) ? board.black_board : board.white_board;
+  ul opponent_bit_board = 
+    (board.turn == 1) ? board.white_board : board.black_board;
+
   ul bits, tmp, mask;
   ul blank = ~(player_bit_board | opponent_bit_board);
   ul legal = 0;
@@ -184,17 +193,14 @@ ul transfer(ul put, int k)
   }
 }
 
-// boardを入れ替える
-void swap_board()
+// turnの側に石を置き，反転する石の位置を返す．
+ul reverse_(Board board, ul put) 
 {
-  player_bit_board ^= opponent_bit_board;
-  opponent_bit_board ^= player_bit_board;
-  player_bit_board ^= opponent_bit_board;
-}
+  ul player_bit_board = 
+    (board.turn == 1) ? board.black_board : board.white_board;
+  ul opponent_bit_board = 
+    (board.turn == 1) ? board.white_board : board.black_board;
 
-// player_bit_board側の石を置き，反転する石の位置を返す．
-ul reverse_(ul put) 
-{
   ul rev = 0;
   for (int k = 0; k < 8; ++k) {
     ul rev_ = 0;
@@ -209,65 +215,39 @@ ul reverse_(ul put)
   return rev;
 }
 
-// player_bit_board側の石を置く．
-void reverse(ul put)
+// turn側に石を置く．
+Board reverse(Board board, ul put)
 {
-  ul rev = reverse_(put);
+  ul player_bit_board = 
+    (board.turn == 1) ? board.black_board : board.white_board;
+  ul opponent_bit_board = 
+    (board.turn == 1) ? board.white_board : board.black_board;
+
+  ul rev = reverse_(board, put);
   player_bit_board ^= put | rev;
   opponent_bit_board ^= rev;
 
-  hist.rev[hist.index] = rev;
-  hist.put[hist.index] = put;
-  hist.turn[hist.index] = turn;
-  hist.index++;
-  swap_board();
-  turn *= -1;
+  board.black_board = (board.turn == 1) ? player_bit_board : opponent_bit_board;
+  board.white_board = (board.turn == 1) ? opponent_bit_board : player_bit_board;
+  board.turn *= -1;
+  return board;
 }
 
-void undo()
+int is_pass(Board board)
 {
-  if (hist.index == 0) return;
-  hist.index--;
-  if (turn != hist.turn[hist.index]) {swap_board(); turn *= -1;}
-  player_bit_board ^= (hist.put[hist.index] | hist.rev[hist.index]);
-  opponent_bit_board ^= hist.rev[hist.index];
-}
 
-int is_pass()
-{
-  ul player_legal = generate_all_legal_moves();
-  swap_board();
-  ul opponent_legal = generate_all_legal_moves();
-  swap_board();
+  ul player_legal = generate_all_legal_moves(board);
+  board.turn *= -1;
+  ul opponent_legal = generate_all_legal_moves(board);
   return (player_legal == 0UL) && (opponent_legal != 0UL);
 }
 
-int is_finished()
+int is_finished(Board board)
 {
-  ul player_legal = generate_all_legal_moves();
-  swap_board();
-  ul opponent_legal = generate_all_legal_moves();
-  swap_board();
+  ul player_legal = generate_all_legal_moves(board);
+  board.turn *= -1;
+  ul opponent_legal = generate_all_legal_moves(board);
   return (player_legal == 0UL) && (opponent_legal == 0UL);
-}
-
-void test()
-{
-  init_board();
-  print_board();
-  printf("%d\n", bit_count(player_bit_board));
-  printf("%d\n", bit_count(opponent_bit_board));
-  clock_t start = clock();
-  for (int i = 0; i < 1000000; ++i) generate_all_legal_moves();
-  clock_t end = clock();
-  printf("%f\n", (double)(end-start) / CLOCKS_PER_SEC);
-  ul legal = generate_all_legal_moves();
-  print_mask(legal);
-  ul put = 0x0000100000000000;
-  reverse(put);
-  print_board();
-  undo();
-  print_board();
 }
 
 ul to_bit_board(int col, int row)
@@ -299,97 +279,111 @@ int weight[8][8] = {
   {30, -12, 0, -1, -1, 0, -12, 30}
 };
 
-int eval()
+int eval(Board board)
 {
+  ul player_bit_board = 
+    (board.turn == 1) ? board.black_board : board.white_board;
+  ul opponent_bit_board = 
+    (board.turn == 1) ? board.white_board : board.black_board;
+
   int score = 0;
   for (int i = 0; i < 8; ++i)
     for (int j = 0; j < 8; ++j) {
-      score += weight[i][j] * bit_count((1 << (8*i+j)) & player_bit_board);
-      score -= weight[i][j] * bit_count((1 << (8*i+j)) & opponent_bit_board);
+      score += weight[i][j] * bit_count((1UL << (8*i+j)) & player_bit_board);
+      score -= weight[i][j] * bit_count((1UL << (8*i+j)) & opponent_bit_board);
     }
   return score;
 }
 
-ul best_put_;
-ul negamax(int depth, int max_depth, int turn_)
+
+int negamax_(Board board, int depth, int max_depth, ul* best_put)
 {
   if (depth == max_depth)
-    return eval() * turn_;
-  if (is_pass()) 
-    return -100*turn_;
-  if (is_finished()) 
-    return bit_count(player_bit_board) - bit_count(opponent_bit_board);
+    return eval(board);
+  if (is_pass(board))
+    return -100;
+  if (is_finished(board))
+    return (bit_count(board.black_board) - bit_count(board.white_board))*board.turn;
 
   int best = -1e9;
-  ul legal = generate_all_legal_moves();
+  ul legal = generate_all_legal_moves(board);
   int n = bit_count(legal);
   for (int i = 0; i < 64; ++i) {
     ul put = 1UL << i;
     if (legal & put) {
-      reverse(put);
-      int v = -negamax(depth+1, max_depth, -turn_);
+      Board new_board = reverse(board, put);
+      int v = -negamax_(new_board, depth+1, max_depth, NULL);
       if (v > best) {
         best = v;
         if (depth == 0) 
-          best_put_ = put;
+          *best_put = put;
       }
-      undo();
     }
   }
   return best;
 }
 
-ul best_put()
+
+ul negamax(Board board, int max_depth)
 {
-  negamax(0, 3, turn);
-  return best_put_;
+  ul best_put;
+  negamax_(board, 0, max_depth, &best_put);
+  return best_put;
 }
+
 
 void game()
 {
-  srand((unsigned int)time(NULL));
-  init_board();
-  int human_side = 1;
-  while (1) {
-    print_board();
+  Board board = init_board();
+  History hist;
+  hist.board[0] = board;
+  hist.index = 1;
 
-    if (is_pass()) {
-      printf("turn = %2d, move = Pass\n", turn);
-      turn *= -1; 
-      swap_board();
+  int human_side = 2;
+
+  while (1) {
+    print_board(board);
+
+    if (is_pass(board)) {
+      printf("turn = %2d, move = Pass\n", board.turn);
+      board.turn *= -1;
       continue;
     }
-    if (is_finished()) break;
+    if (is_finished(board)) break;
 
     ul put;
-    if (turn == human_side) {
+    if (board.turn == human_side) {
       char buf[1000];
       while (1) { // 入力
         printf("Where? ");
         scanf("%s", buf);
         if (buf[0] == 'u') break;
         put = to_bit_board(buf[0]-'a', buf[1]-'1');
-        if (generate_all_legal_moves() & put) break;
+        if (generate_all_legal_moves(board) & put) break;
         printf("%s is not a legal move!\n\n", buf);
       }
+
       if (buf[0] == 'u') { // 自分のターンに戻るまでundo()
-        do undo(); while (turn != human_side && hist.index != 0);
+        do {
+          hist.index--;
+          board = hist.board[hist.index];
+        } while (hist.index != 0 && board.turn != human_side);
         continue;
       }
     } 
+
     else {
       // ul legal = generate_all_legal_moves();
       // put = get_random_move(legal);
-      put = best_put();
+      put = negamax(board, 6);
     }
 
-    printf("turn = %2d, put = %#017lx\n", turn, put);
-    reverse(put);
+    printf("turn = %2d, put = %#017lx\n", board.turn, put);
+    board = reverse(board, put);
   }
 
-  if (turn == -1) {turn *= -1; swap_board();}
-  int black_count = bit_count(player_bit_board);
-  int white_count = bit_count(opponent_bit_board);
+  int black_count = bit_count(board.black_board);
+  int white_count = bit_count(board.white_board);
   if (black_count == white_count) printf("%d - %d  Draw.\n", black_count, white_count);
   if (black_count > white_count) printf("%d - %d  Black Win!\n", black_count, white_count);
   if (black_count < white_count) printf("%d - %d  White Win!\n", black_count, white_count);
@@ -397,13 +391,8 @@ void game()
 
 int main(void)
 {
-  // test();
-  // clock_t start = clock();
-  // for (int i = 0; i < 100000; ++i) game();
-  // clock_t end = clock();
-  // printf("%f\n", (double)(end-start) / CLOCKS_PER_SEC);
+  srand((unsigned int)time(NULL));
   game();
   return 0;
 }
-
 
