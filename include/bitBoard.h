@@ -28,13 +28,5 @@ int is_finished(Board board);
 ul to_bit_board(int col, int row);
 ul get_random_move(ul moves);
 int eval(Board board);
-int max_node(Board board, int depth, int max_depth, ul* best_put);
-int min_node(Board board, int depth, int max_depth, ul* best_put);
-ul minimax(Board board, int max_depth);
-int negamax_(Board board, int depth, int max_depth, ul* best_put);
-ul negamax(Board board, int max_depth);
-ul next_put(Board board);
-
-int game(int verbose);
 
 #endif

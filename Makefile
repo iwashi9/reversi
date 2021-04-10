@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -I./include
-OBJS = src/main.o src/bitBoard.o
+OBJS = src/main.o src/bitBoard.o src/minimax.o
 TARGET = bin/rev
 
 $(TARGET): $(OBJS)
