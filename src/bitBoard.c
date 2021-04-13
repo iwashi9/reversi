@@ -49,7 +49,6 @@ void print_board(Board board)
   putchar('\n');
 }
 
-
 int bit_count(ul a)
 {
   a = (a & 0x5555555555555555) + ((a & 0xaaaaaaaaaaaaaaaa) >> 1);
@@ -244,34 +243,72 @@ ul to_bit_board(int col, int row)
 ul get_random_move(ul moves)
 {
   int n = bit_count(moves);
-  int k = rand() % n + 1;
-  for (int i = 0; i < 64; ++i) {
-    if (moves & (1UL << i)) {
-      k--;
-      if (k == 0) return (1UL << i);
-    }
+  int k = rand() % n;
+
+  long lmoves = (long)moves;
+  ul put = 0UL;
+  while (lmoves != 0UL) {
+    put = (ul)(lmoves & -lmoves);
+    lmoves ^= put;
+    // printf("%#18lx %#18lx\n",put,lmoves);
+    if (k-- == 0) return put;
   }
   return 0UL;
 }
 
+// 適当に拾ってきた評価値
+// int weight[8][8] = {
+//   {30 , -12, 0 , -1, -1, 0 , -12, 30 },
+//   {-12, -15, -3, -3, -3, -3, -15, -12},
+//   {0  , -3 , 0 , -1, -1, 0 , -3 , 0  },
+//   {-1 , -3 , -1, -1, -1, -1, -3 , -1 },
+//   {-1 , -3 , -1, -1, -1, -1, -3 , -1 },
+//   {0  , -3 , 0 , -1, -1, 0 , -3 , 0  },
+//   {-12, -15, -3, -3, -3, -3, -15, -12},
+//   {30 , -12, 0 , -1, -1, 0 , -12, 30 }
+// };
+
+// https://www.info.kindai.ac.jp/~takasi-i/thesis/2012_09-1-037-0133_S_Shiota_thesis.pdf
 int weight[8][8] = {
-  {30 , -12, 0 , -1, -1, 0 , -12, 30 },
-  {-12, -15, -3, -3, -3, -3, -15, -12},
-  {0  , -3 , 0 , -1, -1, 0 , -3 , 0  },
-  {-1 , -3 , -1, -1, -1, -1, -3 , -1 },
-  {-1 , -3 , -1, -1, -1, -1, -3 , -1 },
-  {0  , -3 , 0 , -1, -1, 0 , -3 , 0  },
-  {-12, -15, -3, -3, -3, -3, -15, -12},
-  {30 , -12, 0 , -1, -1, 0 , -12, 30 }
+  { 45, -11,  4, -1, -1,  4, -11,  45},
+  {-11, -16, -1, -3, -3, -1, -16, -11},
+  {  4,  -1,  2, -1, -1,  2,  -1,   4},
+  {-1 , -3 , -1,  0,  0, -1,  -3,  -1},
+  {-1 , -3 , -1,  0,  0, -1,  -3,  -1},
+  {  4,  -1,  2, -1, -1,  2,  -1,   4},
+  {-11, -16, -1, -3, -3, -1, -16, -11},
+  { 45, -11,  4, -1, -1,  4, -11,  45}
 };
 
 int eval(Board board)
 {
   int score = 0;
+
   for (int i = 0; i < 8; ++i)
     for (int j = 0; j < 8; ++j) {
       if ((1UL << (8*i+j)) & board.black_board) score += weight[i][j];
       if ((1UL << (8*i+j)) & board.white_board) score -= weight[i][j];
     }
+
+  score *= 2;
+
+  board.turn = 1;
+  score += bit_count(generate_all_legal_moves(board));
+  board.turn = -1;
+  score -= bit_count(generate_all_legal_moves(board));
+
   return score;
+}
+
+
+void ul_to_str(ul put, char *str)
+{
+  for (int i = 0; i < 8; ++i)
+    for (int j = 0; j < 8; ++j) {
+      if (put & (1UL << (63-j-i*8))) {
+        str[0] = 'a' + j;
+        str[1] = '1' + i;
+        str[2] = '\0';
+      }
+    }
 }

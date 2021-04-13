@@ -28,5 +28,6 @@ int is_finished(Board board);
 ul to_bit_board(int col, int row);
 ul get_random_move(ul moves);
 int eval(Board board);
+void ul_to_str(ul put, char *str);
 
 #endif
